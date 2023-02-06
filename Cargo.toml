@@ -1,11 +1,21 @@
 [package]
 authors     = ["Xavier Lau <xavier@inv.cafe>"]
 build       = "build.rs"
-description = "<DESCRIPTION>"
+description = "Manage all your crates with a single command."
 edition     = "2021"
-homepage    = "https://<NAME>.hack.ink"
+homepage    = "https://cargo-all.hack.ink"
 license     = "GPL-3.0"
-name        = "<NAME>"
+name        = "cargo-all"
 readme      = "README.md"
-repository  = "https://github.com/hack-ink/<NAME>"
+repository  = "https://github.com/hack-ink/cargo-all"
 version     = "0.1.0"
+
+[build-dependencies]
+vergen = { version = "7.5.0" }
+
+[dependencies]
+anyhow             = { version = "1.0" }
+clap               = { version = "4.1", features = ["derive"] }
+tracing            = { version = "0.1" }
+tracing-subscriber = { version = "0.3" }
+walkdir            = { version = "2.3" }
