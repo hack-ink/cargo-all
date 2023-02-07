@@ -1,9 +1,30 @@
 // std
-use std::{env, fs, path::PathBuf, result::Result as StdResult};
+use std::{
+	env,
+	fs::{self, File},
+	io::{Read, Write},
+	path::PathBuf,
+	result::Result as StdResult,
+};
 // crates.io
 use anyhow::Result;
 use clap::{Args, Parser, Subcommand, ValueEnum};
+use regex::bytes::{Captures, Regex};
 use walkdir::{DirEntry, WalkDir};
+
+static mut VERBOSE: bool = false;
+
+fn main() -> Result<()> {
+	let mut args = env::args();
+
+	if let Some("all") = env::args().nth(1).as_deref() {
+		args.next();
+	}
+
+	Cli::parse_from(args).run()?;
+
+	Ok(())
+}
 
 #[derive(Debug, Parser)]
 #[command(
@@ -20,12 +41,20 @@ use walkdir::{DirEntry, WalkDir};
 struct Cli {
 	#[command(subcommand)]
 	subcmd: Subcmd,
+	#[arg(global = true, long, short)]
+	verbose: bool,
 }
 impl Cli {
 	fn run(self) -> Result<()> {
 		tracing_subscriber::fmt::init();
 
-		self.subcmd.run()?;
+		let Self { subcmd, verbose } = self;
+
+		unsafe {
+			VERBOSE = verbose;
+		}
+
+		subcmd.run()?;
 
 		Ok(())
 	}
@@ -33,7 +62,7 @@ impl Cli {
 
 #[derive(Debug, Subcommand)]
 enum Subcmd {
-	Toolchain(ToolchainCmd),
+	SetToolchain(SetToolchainCmd),
 	Clean(CleanCmd),
 }
 impl Subcmd {
@@ -42,7 +71,7 @@ impl Subcmd {
 		use Subcmd::*;
 
 		match self {
-			Toolchain(c) => c.run(),
+			SetToolchain(c) => c.run(),
 			Clean(c) => c.run(),
 		}?;
 
@@ -51,9 +80,65 @@ impl Subcmd {
 }
 
 #[derive(Debug, Args)]
-struct ToolchainCmd {}
-impl ToolchainCmd {
+struct SetToolchainCmd {
+	/// Set toolchain channel.
+	///
+	/// e.g. "nightly-2023-01-01"
+	#[arg(value_name = "CHANNEL")]
+	channel: String,
+}
+impl SetToolchainCmd {
 	fn run(self) -> Result<()> {
+		let Self { channel } = self;
+		let verbose = unsafe { VERBOSE };
+		let regex = Regex::new(r#"( *channel *= *)".*""#).unwrap();
+		let set_version = |p: PathBuf| {
+			if verbose {
+				tracing::info!("setting: {}", p.display());
+			}
+
+			match File::open(&p) {
+				Ok(mut f) => {
+					let mut v = Vec::new();
+
+					if let Err(e) = f.read_to_end(&mut v) {
+						tracing::error!("skipped due to, {e:?}");
+					}
+
+					let v = regex.replace(&v, |c: &Captures| {
+						let mut r = c[1].to_owned();
+
+						r.push(b'"');
+						r.extend(channel.as_bytes());
+						r.push(b'"');
+
+						r
+					});
+					let p_tmp = p.with_extension("cargo-all");
+
+					match File::create(&p_tmp) {
+						Ok(mut f) => {
+							if let Err(e) = f.write_all(&v) {
+								tracing::error!("skipped due to, {e:?}");
+							}
+							if let Err(e) = fs::rename(&p_tmp, p) {
+								tracing::error!("skipped due to, {e:?}");
+
+								if let Err(e) = fs::remove_file(p_tmp) {
+									tracing::error!("failed to remove tmp file due to, {e:?}");
+								}
+							}
+						},
+
+						Err(e) => tracing::error!("skipped due to, {e:?}"),
+					}
+				},
+				Err(e) => tracing::error!("skipped due to, {e:?}"),
+			}
+		};
+
+		walk_with(&["rust-toolchain.toml", "rust-toolchain"], set_version)?;
+
 		Ok(())
 	}
 }
@@ -61,69 +146,46 @@ impl ToolchainCmd {
 #[derive(Debug, Args)]
 struct CleanCmd {
 	/// Profile.
-	#[arg(value_enum, long, short, value_name = "NAME", default_value = "debug")]
+	#[arg(value_enum, value_name = "NAME", default_value = "debug")]
 	profile: Profile,
 }
 impl CleanCmd {
 	fn run(self) -> Result<()> {
-		fn walk_with<F>(f: F) -> Result<()>
-		where
-			F: Fn(PathBuf),
-		{
-			let to_filter = |e: &DirEntry| {
-				let n = e.file_name().to_string_lossy();
-
-				!(n.starts_with('.') || n == "target")
-			};
-			let to_match = |r: StdResult<DirEntry, _>| match r {
-				Ok(e) =>
-					if e.file_name().to_string_lossy().ends_with("Cargo.toml") {
-						e.path().parent().map(|p| p.to_path_buf())
-					} else {
-						None
-					},
-				Err(e) => {
-					tracing::error!("skipped due to, {e:?}");
-
-					None
-				},
-			};
-
-			for e in WalkDir::new(env::current_dir()?)
-				.into_iter()
-				.filter_entry(to_filter)
-				.filter_map(to_match)
-			{
-				f(e);
-			}
-
-			Ok(())
-		}
-
 		let Self { profile } = self;
+		let verbose = unsafe { VERBOSE };
 		let rm = |p: PathBuf| {
 			if let Err(e) = fs::remove_dir_all(p) {
-				tracing::warn!("skipped due to, {e:?}");
+				if verbose {
+					tracing::warn!("skipped due to, {e:?}");
+				}
 			}
 		};
 		let rm_all = |p: PathBuf| {
-			let p = p.join("target");
+			let p = p.parent().expect("already checked in previous step; qed").join("target");
 
-			tracing::info!("removing: {}", p.display());
+			if verbose {
+				tracing::info!("removing: {}", p.display());
+			}
 
 			rm(p);
 		};
 		let rm_profile = |p: PathBuf| {
-			let p = p.join("target").join(profile.as_str());
+			let p = p
+				.parent()
+				.expect("already checked in previous step; qed")
+				.join("target")
+				.join(profile.as_str());
 
-			tracing::info!("removing: {}", p.display());
+			if verbose {
+				tracing::info!("removing: {}", p.display());
+			}
 
 			rm(p);
 		};
 
 		match profile {
-			Profile::All => walk_with(rm_all)?,
-			_ => walk_with(rm_profile)?,
+			Profile::All => walk_with(&["Cargo.toml"], rm_all)?,
+			_ => walk_with(&["Cargo.toml"], rm_profile)?,
 		}
 
 		Ok(())
@@ -149,10 +211,37 @@ impl Profile {
 	}
 }
 
-fn main() -> Result<()> {
-	let cli = Cli::parse();
+fn walk_with<F>(targets: &[&str], f: F) -> Result<()>
+where
+	F: Fn(PathBuf),
+{
+	let to_filter = |e: &DirEntry| {
+		let n = e.file_name().to_string_lossy();
 
-	cli.run()?;
+		!(n.starts_with('.') || n == "target")
+	};
+	let to_match = |r: StdResult<DirEntry, _>| match r {
+		Ok(e) => {
+			let n = e.file_name().to_string_lossy();
+
+			if targets.iter().any(|t| *t == n) {
+				Some(e.path().to_path_buf())
+			} else {
+				None
+			}
+		},
+		Err(e) => {
+			tracing::error!("skipped due to, {e:?}");
+
+			None
+		},
+	};
+
+	for e in
+		WalkDir::new(env::current_dir()?).into_iter().filter_entry(to_filter).filter_map(to_match)
+	{
+		f(e);
+	}
 
 	Ok(())
 }
