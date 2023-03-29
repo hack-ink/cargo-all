@@ -15,7 +15,7 @@ vergen = { version = "7.5.1" }
 
 [dependencies]
 anyhow             = { version = "1.0" }
-clap               = { version = "4.1", features = ["derive"] }
+clap               = { version = "4.2", features = ["derive"] }
 once_cell          = { version = "1.17" }
 regex              = { version = "1.7" }
 tracing            = { version = "0.1" }
