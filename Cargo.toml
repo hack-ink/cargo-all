@@ -8,12 +8,14 @@ license     = "GPL-3.0"
 name        = "cargo-all"
 readme      = "README.md"
 repository  = "https://github.com/hack-ink/cargo-all"
-version     = "0.2.3"
+version     = "0.2.4"
 
 [build-dependencies]
-vergen = { version = "7.5.1" }
+# crates.io
+vergen = { version = "8.1", features = ["build", "cargo", "git", "gitcl"] }
 
 [dependencies]
+# crates.io
 anyhow             = { version = "1.0" }
 clap               = { version = "4.2", features = ["derive"] }
 once_cell          = { version = "1.17" }
