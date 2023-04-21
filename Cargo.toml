@@ -19,7 +19,7 @@ vergen = { version = "8.1", features = ["build", "cargo", "git", "gitcl"] }
 anyhow             = { version = "1.0" }
 clap               = { version = "4.2", features = ["derive"] }
 once_cell          = { version = "1.17" }
-regex              = { version = "1.7" }
+regex              = { version = "1.8" }
 tracing            = { version = "0.1" }
 tracing-subscriber = { version = "0.3" }
 walkdir            = { version = "2.3" }
