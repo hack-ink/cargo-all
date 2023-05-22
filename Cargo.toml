@@ -12,7 +12,7 @@ version     = "0.2.4"
 
 [build-dependencies]
 # crates.io
-vergen = { version = "8.1", features = ["build", "cargo", "git", "gitcl"] }
+vergen = { version = "8.2", features = ["build", "cargo", "git", "gitcl"] }
 
 [dependencies]
 # crates.io
