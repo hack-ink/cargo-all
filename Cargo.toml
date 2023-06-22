@@ -18,7 +18,7 @@ vergen = { version = "8.2", features = ["build", "cargo", "git", "gitcl"] }
 # crates.io
 anyhow             = { version = "1.0" }
 clap               = { version = "4.3", features = ["derive"] }
-once_cell          = { version = "1.17" }
+once_cell          = { version = "1.18" }
 regex              = { version = "1.8" }
 tracing            = { version = "0.1" }
 tracing-subscriber = { version = "0.3" }
