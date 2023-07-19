@@ -17,7 +17,6 @@ jobs:
           [
             { name: x86_64-unknown-linux-gnu, os: ubuntu-latest },
             { name: aarch64-apple-darwin, os: macos-latest },
-            { name: x86_64-apple-darwin, os: macos-latest },
             {
               name: x86_64-pc-windows-msvc,
               os: windows-latest,
@@ -30,10 +29,10 @@ jobs:
       - name: Setup Rust toolchain
         run: rustup target add ${{ matrix.target.name }}
       - name: Build
-        run: cargo build --release --locked --target ${{ matrix.target.name }}
+        run: cargo build --profile ci-release --locked --target ${{ matrix.target.name }}
       - name: Compress
         run: |
-          mv target/${{ matrix.target.name }}/release/cargo-all${{ matrix.target.extension }} .
+          mv target/${{ matrix.target.name }}/ci-release/cargo-all${{ matrix.target.extension }} .
           zstd --ultra -22 -o cargo-all-${{ matrix.target.name }}.zst cargo-all${{ matrix.target.extension }}
       - name: Collect artifact
         run: |
@@ -44,6 +43,16 @@ jobs:
         with:
           name: artifacts
           path: artifacts
+
+  release:
+    name: Release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Publish
+        uses: softprops/action-gh-release@v1
+        with:
+          discussion_category_name: Announcements
+          generate_release_notes: true
 
   release:
     name: Release
