@@ -3,12 +3,12 @@ authors     = ["Xavier Lau <xavier@inv.cafe>"]
 build       = "build.rs"
 description = "Manage all your crates with a single command."
 edition     = "2021"
-homepage    = "https://cargo-all.hack.ink"
+homepage    = "https://hack.ink/cargo-all"
 license     = "GPL-3.0"
 name        = "cargo-all"
 readme      = "README.md"
 repository  = "https://github.com/hack-ink/cargo-all"
-version     = "0.2.4"
+version     = "0.2.5"
 
 [profile.ci-dev]
 incremental = false
@@ -20,12 +20,13 @@ lto      = true
 
 [build-dependencies]
 # crates.io
-vergen = { version = "8.2", features = ["build", "cargo", "git", "gitcl"] }
+vergen = { version = "8.3", features = ["build", "cargo", "git", "gitcl"] }
 
 [dependencies]
 # crates.io
 anyhow             = { version = "1.0" }
 clap               = { version = "4.4", features = ["derive"] }
+color-eyre         = { version = "0.6" }
 once_cell          = { version = "1.19" }
 regex              = { version = "1.10" }
 tracing            = { version = "0.1" }

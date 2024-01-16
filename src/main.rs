@@ -8,13 +8,22 @@ use std::{
 };
 // crates.io
 use anyhow::Result;
-use clap::{Args, Parser, Subcommand, ValueEnum};
+use clap::{
+	builder::{
+		styling::{AnsiColor, Effects},
+		Styles,
+	},
+	Args, Parser, Subcommand, ValueEnum,
+};
 use regex::bytes::{Captures, Regex};
 use walkdir::{DirEntry, WalkDir};
 
 static mut VERBOSE: bool = false;
 
 fn main() -> Result<()> {
+	color_eyre::install().unwrap();
+	tracing_subscriber::fmt::init();
+
 	let mut args = env::args();
 
 	if let Some("all") = env::args().nth(1).as_deref() {
@@ -37,6 +46,7 @@ fn main() -> Result<()> {
 	),
 	about,
 	rename_all = "kebab",
+	styles = styles(),
 )]
 struct Cli {
 	#[command(subcommand)]
@@ -46,8 +56,6 @@ struct Cli {
 }
 impl Cli {
 	fn run(self) -> Result<()> {
-		tracing_subscriber::fmt::init();
-
 		let Self { subcmd, verbose } = self;
 
 		unsafe {
@@ -209,6 +217,14 @@ impl Profile {
 			All => unreachable!(),
 		}
 	}
+}
+
+fn styles() -> Styles {
+	Styles::styled()
+		.header(AnsiColor::Red.on_default() | Effects::BOLD)
+		.usage(AnsiColor::Red.on_default() | Effects::BOLD)
+		.literal(AnsiColor::Blue.on_default() | Effects::BOLD)
+		.placeholder(AnsiColor::Green.on_default())
 }
 
 fn walk_with<F>(targets: &[&str], f: F) -> Result<()>
