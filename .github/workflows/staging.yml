@@ -1,9 +1,13 @@
 name: Staging
-on:
-  workflow_dispatch:
 
 env:
+  CARGO_REGISTRIES_CRATES_IO_PROTOCOL: sparse
   CARGO_TERM_COLOR: always
+
+  RUST_BACKTRACE: full
+
+on:
+  workflow_dispatch:
 
 jobs:
   build:
@@ -13,13 +17,9 @@ jobs:
       matrix:
         target:
           [
-            { name: x86_64-unknown-linux-gnu, os: ubuntu-latest },
             { name: aarch64-apple-darwin, os: macos-latest },
-            {
-              name: x86_64-pc-windows-msvc,
-              os: windows-latest,
-              extension: .exe,
-            },
+            { name: x86_64-unknown-linux-gnu, os: ubuntu-latest },
+            { name: x86_64-pc-windows-msvc, os: windows-latest },
           ]
     steps:
       - name: Fetch latest code
@@ -28,16 +28,37 @@ jobs:
         run: rustup target add ${{ matrix.target.name }}
       - name: Build
         run: cargo build --profile ci-release --locked --target ${{ matrix.target.name }}
-      - name: Compress
+      - name: Pack (macOS)
+        if: matrix.target.os == 'macos-latest'
         run: |
-          mv target/${{ matrix.target.name }}/ci-release/cargo-all${{ matrix.target.extension }} .
-          zstd --ultra -22 -o cargo-all-${{ matrix.target.name }}.zst cargo-all${{ matrix.target.extension }}
+          mv target/${{ matrix.target.name }}/ci-release/cargo-all .
+          zip cargo-all-${{ matrix.target.name }}.zip cargo-all
+      - name: Pack (Windows)
+        if: matrix.target.os == 'windows-latest'
+        run: |
+          mv target/${{ matrix.target.name }}/ci-release/cargo-all.exe .
+          Compress-Archive -Path cargo-all.exe -DestinationPath cargo-all-${{ matrix.target.name }}.zip
+      - name: Pack (Linux)
+        if: matrix.target.os == 'ubuntu-latest'
+        run: |
+          mv target/${{ matrix.target.name }}/ci-release/cargo-all .
+          tar -czvf cargo-all-${{ matrix.target.name }}.tar.gz cargo-all
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: cargo-all-${{ matrix.target.name }}
-          path: cargo-all-${{ matrix.target.name }}.zst
+          path: cargo-all-${{ matrix.target.name }}.*
           retention-days: 1
+
+  # staging:
+  #   name: Staging
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - name: Publish
+  #       uses: softprops/action-gh-release@v2
+  #       with:
+  #         discussion_category_name: Announcements
+  #         generate_release_notes: true
 
   staging:
     name: Staging
@@ -60,7 +81,7 @@ jobs:
           mv ../MD5 .
           ls -al
       # - name: Publish
-      #   uses: softprops/action-gh-release@v1
+      #   uses: softprops/action-gh-release@v2
       #   with:
       #     discussion_category_name: Announcements
       #     generate_release_notes: true
